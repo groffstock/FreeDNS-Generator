@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DropMail Temp Email</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #0f0f0f;
+    color: #fff;
+    padding: 20px;
+  }
+  .box {
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+  }
+  .email {
+    color: #4ade80;
+    font-size: 1.2em;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<h1>📬 DropMail Temporary Email</h1>
+
+<div class="box">
+  <strong>Email:</strong>
+  <div id="email" class="email">Generating…</div>
+</div>
+
+<div class="box">
+  <strong>Inbox:</strong>
+  <ul id="inbox"></ul>
+</div>
+
+<script>
+const TOKEN = "web-test-12345678"; // 8+ chars
+const API = `https://dropmail.me/api/graphql/${TOKEN}`;
+
+let sessionId = null;
+
+async function createSession() {
+  const query = `
+    mutation {
+      introduceSession {
+        id
+        addresses { address }
+      }
+    }
+  `;
+
+  const url = API + "?query=" + encodeURIComponent(query);
+  const res = await fetch(url);
+  const json = await res.json();
+
+  sessionId = json.data.introduceSession.id;
+  document.getElementById("email").textContent =
+    json.data.introduceSession.addresses[0].address;
+
+  pollInbox();
+}
+
+async function pollInbox() {
+  const query = `
+    query ($id: ID!) {
+      session(id: $id) {
+        mails {
+          fromAddr
+          headerSubject
+          text
+        }
+      }
+    }
+  `;
+
+  const url =
+    API +
+    "?query=" + encodeURIComponent(query) +
+    "&variables=" + encodeURIComponent(JSON.stringify({ id: sessionId }));
+
+  const res = await fetch(url);
+  const json = await res.json();
+
+  const inbox = document.getElementById("inbox");
+  inbox.innerHTML = "";
+
+  json.data.session.mails.forEach(mail => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${mail.headerSubject || "(no subject)"}</strong><br>
+      From: ${mail.fromAddr}<br>
+      <pre>${mail.text || ""}</pre>
+    `;
+    inbox.appendChild(li);
+  });
+
+  setTimeout(pollInbox, 10000);
+}
+
+createSession();
+</script>
+
+</body>
+</html>
